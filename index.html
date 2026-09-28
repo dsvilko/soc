@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Socrative izvještaj generator</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;font-family:Lato,Arial,sans-serif}
+body{margin:0;background:#053777;color:#fff;font-size:18px}
+.form-group{max-width:760px;margin:0 auto 15px;padding:10px 20px}
+header{padding:18px 20px 4px;text-align:center}
+h1{font-weight:300;margin:8px 0;font-size:32px}
+label{font-weight:500;display:block;margin:10px 0 5px;text-transform:uppercase;font-size:18px}
+label span{float:right;text-transform:none;font-weight:400;line-height:1em;font-style:italic;opacity:.8}
+textarea,.form-control{display:block;padding:10px;width:100%;font-size:19px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;font-weight:400;border-radius:4px}
+textarea:focus,input:focus{outline:2px solid #fff}
+button,.button{cursor:pointer;text-align:center;margin:4px;padding:11px 18px;font-size:22px;border:2px solid #fff;border-radius:50px;text-decoration:none;background:none;color:#fff}
+button:hover,.button:hover{background:#ff0;color:#000}
+.primary{width:100%;background:#ff8;color:#000;border:0}
+.file-area{position:relative}
+.file-dummy{padding:20px;background:rgba(255,0,0,.25);border:2px dashed rgba(255,0,0,.35);text-align:center}
+.file-area input[type=file]{position:absolute;width:100%;height:100%;inset:0;opacity:0;cursor:pointer}
+.file-area input:valid+.file-dummy{background:rgba(0,255,0,.25);border-color:rgba(0,255,0,.4)}
+#status{display:none;padding:12px 16px;margin:10px auto;background:rgba(255,255,255,.12);border-radius:8px}
+#report{display:none;max-width:900px;margin:auto;padding:10px 15px 40px}
+.student{margin:8px 0 22px}
+.student-name{font-weight:600;margin:4px 0;cursor:pointer}
+.student-name:hover{text-decoration:underline}
+.student-name.used{opacity:.55}
+.student-name.used::after{content:" ✓ kopirano";font-size:80%}
+.student-name.current{background:#ff0;color:#000;border-radius:4px;padding:2px 6px;opacity:1}
+#reportContent.hideBlocks .student-copy{display:none}
+.student-copy{background:#ffffaa;color:#111;padding:10px 12px;border-radius:4px;cursor:pointer}
+.student-copy:hover{background:#fff}
+.student-copy.used{background:#0a58ca;color:#fff;font-size:80%}
+.student-copy.used:hover{background:#0a58ca}
+.student-copy.copied{background:#ddd}
+.small{font-size:80%;opacity:.85}
+.help{max-width:760px;margin:15px auto 30px}
+.help h3{margin:18px 0 6px;font-size:19px;text-transform:uppercase}
+.help p,.help li{font-size:18px;line-height:1.45}
+.help code{background:rgba(255,255,255,.15);padding:1px 6px;border-radius:4px}
+details{background:rgba(0,0,0,.12);padding:10px 14px;border-radius:8px}
+summary{cursor:pointer;font-size:20px;font-weight:600}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:10;padding:20px;overflow:auto}
+.modal-box{max-width:850px;margin:30px auto;background:#053777;border:1px solid #fff;border-radius:12px;padding:20px}
+.match{padding:12px;margin:8px 0;background:rgba(255,255,255,.1);border-radius:8px}
+.match strong{display:block}
+.badge{font-size:13px;padding:3px 7px;border:1px solid #fff;border-radius:12px;margin-left:5px}
+.match-actions{text-align:right}
+.warning{background:rgba(255,190,0,.18);padding:10px;border-radius:8px;margin:10px 0}
+#error{display:none;background:#8b1e1e;padding:12px;border-radius:8px}
+#missingWrap{display:none;max-width:760px;margin:15px auto;padding:10px 20px;background:rgba(255,190,0,.12);border:1px solid rgba(255,190,0,.6);border-radius:8px}
+.missing-q{margin:12px 0;padding:10px;background:rgba(0,0,0,.2);border-radius:8px}
+.missing-q strong{display:block;margin-bottom:6px}
+.missing-q input{display:block;padding:10px;width:100%;font-size:18px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:4px}
+@media(max-width:600px){label span{float:none;display:block;margin-top:3px}.form-group{padding:8px 12px}button{font-size:19px}}
+</style>
+</head>
+<body>
+<header><h1>Socrative izvještaj generator</h1></header>
+
+<div class="form-group">
+  <button class="primary" id="generateBtn" type="button">Generiraj Socrative izvještaj</button>
+</div>
+
+<div class="form-group file-area">
+  <label for="xml">Odabir datoteke<span>Socrative .XLSX izvještaj</span></label>
+  <input type="file" id="xml" required accept=".xlsx,.xlsm">
+  <div class="file-dummy"><span id="fileText">odaberi ili dovuci datoteku</span></div>
+</div>
+
+<div class="form-group">
+  <label for="zaglavlje">Zaglavlje<span>opis gradiva</span></label>
+  <textarea id="zaglavlje" rows="3">Kviz provjera znanja.</textarea>
+</div>
+
+<div class="form-group">
+  <label for="opisi">Opisi razina uspjeha<span>prag + opis</span></label>
+  <textarea id="opisi" rows="7">88 Odlična usvojenost ovog nastavnog sadržaja!
+76 Vrlo dobra usvojenost ovog nastavnog sadržaja.
+63 Dobra usvojenost osnovnih pojmova. Za bolju ocjenu je potrebna dodatna vježba.
+50 Usvojen tek dio osnovnih pojmova. Potrebno još puno vježbe.
+0 Nedovoljno dobra usvojenost ovog nastavnog sadržaja. Potrebno puno učenja i vježbe kod kuće.</textarea>
+</div>
+
+<div class="form-group">
+  <label for="pitanja">Prije popisa pitanja<span>tekst koji prethodi popisu pitanja</span></label>
+  <textarea id="pitanja" rows="2">Pitanja na koja nije dan ispravan odgovor #:</textarea>
+</div>
+
+<div class="form-group">
+  <label for="ispravci">Ispravci točnih odgovora<span>npr. 5. A — prazno = bez ispravaka</span></label>
+  <textarea id="ispravci" rows="2"></textarea>
+</div>
+
+<div class="form-group">
+  <div id="status"></div>
+  <div id="error"></div>
+</div>
+
+<div id="missingWrap">
+  <h2 style="margin:6px 0">Nedostaju točni odgovori</h2>
+  <div class="warning">Za sljedeća pitanja nitko nije dao točan odgovor (nema zelene ćelije), pa točan odgovor nije zapisan u XLSX datoteci. Upišite točan odgovor za svako pitanje pa kliknite Nastavi.</div>
+  <div id="missingList"></div>
+  <div style="text-align:right;margin-top:15px">
+    <button id="missingContinue" type="button">Nastavi s unesenim odgovorima</button>
+  </div>
+</div>
+
+<div class="help">
+<details>
+<summary>POMOĆ</summary>
+<h3>Uvod</h3>
+<p>Ovaj web servis namijenjen je kao pomoć pri korištenju Socrative kvizova za formativno vrednovanje učeničkih postignuća. Cilj formativnog vrednovanja, posebno vrednovanja za učenje, je svim učenicima dati što češću, njima i njihovim roditeljima razumljivu, povratnu informaciju o napretku i potencijalnim rupama u znanju i vještinama koje kroz dodatnu vježbu i ponavljanje moraju popuniti. On-line kvizovi kao što je Socrative omogućuju vrlo brzo vrednovanje bez trošenja vremena na ispis i ispravljanje kratkih pisanih provjera. Iako učenici nakon kviza odmah vide što su pogriješili, vrijednost kviza višestruko raste ako do te informacije mogu i kasnije lako doći.</p>
+<p>Ovaj servis kao ulaz uzima razredni izvještaj skinut sa Socrative stranice i opisne ocjene za pojedine razine uspješnosti, a kao izlaz generira zasebne izvještaje za svakog učenika koje je lako unijeti u e-dnevnik. Na taj je način moguće u manje od minute upisati preko 500 linija korisnih povratnih informacija za jedan razred.</p>
+<p>Ova verzija radi potpuno lokalno u pregledniku: XLSX datoteka ne šalje se na server. Za čitanje XLSX datoteke koristi se SheetJS biblioteka učitana s CDN-a; nakon učitavanja stranice obrada podataka odvija se u pregledniku. Program iz razrednog izvještaja prepoznaje pitanja te točne (zelene ćelije) i pogrešne (crvene ćelije) odgovore prema bojama ćelija.</p>
+<h3>Odabir datoteke</h3>
+<p>S lokalnog diska odaberite Socrative .xlsx report datoteku. Tu datoteku dobijete odabirom "Reports" na svojoj Socrative stranici, zatim odaberete neki od završenih kvizova, kliknete na "REPORTS" u gornjem desnom kutu te na "Download" (<i>"Whole Class Excel"</i> mora biti obilježen).</p>
+<h3>Zaglavlje</h3>
+<p>Opis koji će biti postavljen iznad samog izvještaja o uspjehu. Izvještaj za učenika ima oblik:</p>
+<p><i>ZAGLAVLJE</i><br>REZULTAT: postotak (prosjek razreda)<br><i>OPISNA OCJENA</i><br><i>TEKST PRIJE POPISA PITANJA</i><br>Popis svih pitanja, s rednim brojem, na koja nije uspješno dan točan odgovor.</p>
+<h3>Opisi razina uspjeha</h3>
+<p>Niz redova od kojih svaki započinje brojkom iza koje je razmak pa opis. Brojka predstavlja minimalan postotak točno riješenih zadataka kod kojih će učeniku biti dan taj opis. Brojke moraju biti sortirane od najveće do najmanje, na kraju obavezno završno s brojem <b>0</b>. Broj redova odnosno gradacija postignuća nije ograničen. Ako dva uzastopna reda počinju s istim brojem, učenicima u toj kategoriji naizmjenično se bira jedan od ponuđenih opisa — tako se uvodi varijabilnost u opisnim ocjenama iste razine. Pazite da opisi budu rodno neutralni.</p>
+<p><b>Primjer:</b><br><i>80 Uspješno usvojeno gradivo.<br>80 Bravo, većina je gradiva uspješno usvojena.<br>50 Djelomično usvojeno gradivo.<br>0 Gradivo nije zadovoljavajuće usvojeno.</i></p>
+<p>Učenici s 80% ili više dobit će naizmjenično jednu od prve dvije poruke, s između 50% i 79% drugu, a s manje od 50% posljednju poruku. Preporuka je da opise držite pohranjene u datoteci na vlastitom disku kako biste ih brzo kopirali u ovo polje.</p>
+<h3>Višeelementno vrednovanje</h3>
+<p>Program podržava istovremeno praćenje više različitih elemenata vrednovanja preko različitih vrsta pitanja u Socrative kvizu. Na početak teksta svakog pitanja u Socrative kvizu stavite u običnim zagradama jedno slovo koje označava skupinu pitanja, npr. <code>(u)</code> za temeljne pojmove. Ako želite zasebno bodovanje, ispred opisnih ocjena dodajte red ovog oblika (primjer):<br><i>(u) Usvojenost temeljnih pojmova.<br>(p) Primjena na konceptualnim zadacima.</i></p>
+<p>Zasebne opisne ocjene po elementima dodaju se tako da se ispred postotka stavi slovo elementa, npr.:<br><i>u85 Temeljni pojmovi uspješno su usvojeni.<br>u0 Usvojen je samo mali dio temeljnih pojmova.<br>p85 Izvrsno primjenjuje znanje na konceptualnim zadacima.<br>p0 Razumijevanje nije dostatno za primjenu.</i></p>
+<h3>Prije popisa pitanja</h3>
+<p>Kratak tekst koji prethodi popisu pitanja na koja nije dan točan odgovor. Ako red sadrži ljestve <code>#</code>, to mjesto zamjenjuje se pojašnjenjem <code>(odgovoreno | točan odgovor)</code>, a iza svakog pogrešno odgovorenog pitanja ispisuju se odgovor koji je učenik dao i točan odgovor koji je trebao dati. Ako je polje prazno, u izvještaj se dodaje samo uspjeh i opisna ocjena, bez popisa pitanja.</p>
+<h3>Ispravci točnih odgovora</h3>
+<p>Ako je u kvizu pogrešno označen točan odgovor (boje u XLSX-u su krive), upišite ispravak u polje "Ispravci točnih odgovora", jedan po retku u obliku <b>broj. odgovor</b>, npr. <b>5. A</b> — broj je redni broj pitanja u izvještaju (1 = prvo pitanje slijeva u XLSX-u). Polje je zadano prazno, što znači bez ispravaka.</p>
+<p>Ispravak ima prednost pred bojama ćelija: kod izbora jednog slova ili znamenke uspoređuje se početno slovo odgovora (<code>A. metar</code> → A), inače se uspoređuje cijeli tekst odgovora bez oznake izbora. U izvještaju se i dani i ispravan odgovor uvijek prikazuju kao puni tekst bez slova izbora. Neispravan redak ili broj nepostojećeg pitanja javlja grešku umjesto generiranja izvještaja.</p>
+<h3>Nedostaju točni odgovori (ručni unos)</h3>
+<p>Ako za neko pitanje nitko nije odgovorio točno, u stupcu nema zelene ćelije pa točan odgovor nije zapisan u XLSX datoteci. Program tada ne odustaje, nego ispod obrasca prikaže svako takvo pitanje s poljem za ručni upis točnog odgovora. Upišite odgovor za svako navedeno pitanje (prazno polje blokira nastavak uz poruku o grešci) i kliknite "Nastavi s unesenim odgovorima". Oznaka izbora poput <code>A.</code> na početku unosa uklanja se automatski.</p>
+<h3>Višestruki pokušaji i spajanje prijava</h3>
+<p>Prijave s istim imenom automatski se promatraju kao pokušaji istog učenika. Program dodatno traži vrlo slična imena (tipfeler, izostavljeno prezime, dodan broj): imena se uspoređuju bez dijakritike i brojeva, a vrlo sigurni slučajevi spajaju se automatski dok se dvojbeni prije generiranja prikazuju u prozoru "Provjera mogućih dvostrukih prijava" za potvrdu gumbima <b>Spoji</b> / <b>Ne spajaj</b>. Redoslijed redaka u XLSX datoteci nikada se ne koristi za zaključivanje jesu li dvije prijave isti učenik.</p>
+<p>Kod više pokušaja pitanje se smatra ispravno riješenim samo ako učenik na njemu <b>nije niti jednom pogriješio</b> i barem je jednom odgovorio točno. Pitanje neodgovoreno u svim pokušajima tretira se kao pogrešno i u popisu se njegov odgovor prikazuje kao <b>-</b>. Prijave koje su odgovorile na svega par pitanja (6 ili više neodgovorenih od ukupnog broja) izbacuju se s popisa. Konačni popis sortiran je po prezimenu pa imenu.</p>
+<h3>Generiranje izvještaja</h3>
+<p>Nakon što ste odabrali datoteku i ispunili potrebna polja, kliknite <b><i>"Generiraj Socrative izvještaj"</i></b>. Generiranje traje nekoliko sekundi — pričekajte i nemojte višestruko klikati. Na stranici se prikazuje popis svih učenika koji su kviz riješili dajući odgovor na većinu pitanja. Klikom mišem na ime učenika ili na tekst njegovog izvještaja cijeli se tekst automatski kopira te ga s <b>Ctrl-V</b> možete zalijepiti u pripadno polje u e-dnevniku, najjednostavnije grupnim upisom ocjena ili bilježaka.</p>
+<p>Blokovi izvještaja zadano su skriveni (imena su uvijek vidljiva) i prikazuju se gumbom "Prikaži izvještaje". Kopirani učenici označavaju se (zadnje kopirani žutom bojom), a na dnu stranice je gumb za povratak na početak i laki odabir nove datoteke za idući razred bez ponovnog ispunjavanja obrasca.</p>
+<h3>Savjeti za brži unos</h3>
+<p><b>Firefox</b> je preporučen preglednik: s dodatkom <a href="https://addons.mozilla.org/en-US/firefox/addon/open-link-in-sidebar/">Open in Sidebar</a> moguće je otvoriti generator u malenom bočnom prozoru paralelno s e-dnevnikom. U ostalim preglednicima otvorite dva zasebna prozora jedan pored drugoga.</p>
+<h3>Savjeti pri izradi Socrative kviza</h3>
+<p>Recite učenicima da se prijavljuju punim imenom i prezimenom, ne prezimenom pa imenom — tako će lista u izvještaju biti ispravno sortirana za lakši unos u e-dnevnik. Ako pitanja sadrže tekst u [uglatim zagradama], on se izostavlja iz izvještaja, pa zagrade možete koristiti za dodatna pojašnjenja (npr. <i>"[samo jedna riječ]"</i>) bez straha da će završiti u e-dnevniku.</p>
+</details>
+</div>
+
+<div id="matchModal" class="modal">
+  <div class="modal-box">
+    <h2>Provjera mogućih dvostrukih prijava</h2>
+    <div class="warning">Program je pronašao prijave koje bi mogle pripadati istom učeniku. Automatski su spojeni samo vrlo sigurni slučajevi. Za svaki slučaj ispod odaberite <b>Spoji</b> ili <b>Ne spajaj</b>.</div>
+    <div id="matches"></div>
+    <div style="text-align:right;margin-top:15px">
+      <button id="acceptMatches" type="button">Nastavi</button>
+    </div>
+  </div>
+</div>
+
+<div id="report">
+  <div style="text-align:center;margin:12px 0 25px">
+    <button type="button" id="toggleBlocks">Prikaži izvještaje</button>
+    <button type="button" onclick="window.scrollTo({top:0,behavior:'smooth'})">Povratak na početak</button>
+  </div>
+  <div id="reportContent"></div>
+</div>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+let pending = null;
+let pendingMissing = null;
+let randomSeed = Math.floor(Math.random()*100);
+let decisionState = [];
+
+$("xml").addEventListener("change", () => {
+  const f=$("xml").files[0];
+  $("fileText").textContent=f ? "datoteka odabrana: "+f.name : "odaberi ili dovuci datoteku";
+});
+
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function stripDiacritics(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[đĐ]/g,"d").replace(/[łŁ]/g,"l");
+}
+function cleanName(s){
+  return stripDiacritics(s).toUpperCase().replace(/\d+/g," ")
+    .replace(/[^A-Z]+/g," ").trim().replace(/\s+/g," ");
+}
+function tokens(s){ return cleanName(s).split(" ").filter(Boolean); }
+function titleCase(s){
+  return String(s||"").toLowerCase().replace(/(?:^|[\s\-'])\S/g,m=>m.toUpperCase());
+}
+
+// Ispravci točnih odgovora: one correction per line, e.g. "5. A" means the
+// correct answer to question 5 (1-indexed, in report order) is "A".
+// Corrections take priority over the green/red cell colors for that question.
+function parseCorrections(text){
+  const out={};
+  for(const raw of String(text||"").split(/\r?\n/)){
+    const line=raw.trim(); if(!line)continue;
+    const m=line.match(/^(\d+)\s*[\.\)\:\-]?\s*(.+)$/);
+    if(!m || !m[2].trim()) throw new Error(`Neispravan ispravak: "${line}" (očekivano npr. 5. A).`);
+    out[+m[1]]=m[2].trim();
+  }
+  return out;
+}
+function correctionMatches(raw, value){
+  const r=String(raw||"").trim();
+  const v=String(value||"").trim();
+  if(!r || !v)return false;
+  if(/^[A-Za-z0-9]$/.test(v)){
+    // Multiple choice: match the leading choice letter ("A. metar" → A).
+    const m=r.match(/^\s*([A-Za-z0-9])\s*\./);
+    if(m)return m[1].toUpperCase()===v.toUpperCase();
+    return r.toUpperCase()===v.toUpperCase();
+  }
+  const strip=s=>String(s).replace(/^[A-Za-z0-9]+\.\s+/,"").trim().toUpperCase();
+  return strip(r)===strip(v);
+}
+function applyCorrections(questions, corrections){
+  for(const n of Object.keys(corrections)){
+    const i=+n-1;
+    if(i<0||i>=questions.length) throw new Error(`Ispravak se odnosi na nepostojeće pitanje br. ${n} (ima ${questions.length} pitanja).`);
+    questions[i].correct=corrections[n];
+    questions[i].correction=corrections[n];
+  }
+}
+// After attempts are known, replace a single-letter correction ("5. A") with
+// the full answer text carrying that choice letter ("A. metar" → "metar"),
+// so the report shows real text instead of just the letter.
+function resolveCorrectionTexts(questions, attempts){
+  for(let qi=0;qi<questions.length;qi++){
+    const q=questions[qi];
+    if(!q.correction || !/^[A-Za-z0-9]$/.test(q.correction))continue;
+    const want=q.correction.toUpperCase();
+    for(const a of attempts){
+      const raw=a.answers[qi].raw;
+      const m=String(raw).match(/^\s*([A-Za-z0-9])\s*\./);
+      if(m && m[1].toUpperCase()===want){
+        q.correct=String(raw).replace(/^\s*[A-Za-z0-9]+\s*\.\s*/,"").trim()||q.correction;
+        break;
+      }
+    }
+  }
+}
+
+function levenshtein(a,b){
+  if(a===b)return 0;
+  if(!a)return b.length;if(!b)return a.length;
+  let prev=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=0;i<a.length;i++){
+    const cur=[i+1];
+    for(let j=0;j<b.length;j++)
+      cur[j+1]=Math.min(cur[j]+1,prev[j+1]+1,prev[j]+(a[i]===b[j]?0:1));
+    prev=cur;
+  }
+  return prev[b.length];
+}
+function similarity(a,b){
+  a=cleanName(a); b=cleanName(b);
+  if(!a||!b)return 0;
+  if(a===b)return 1;
+  const d=levenshtein(a,b);
+  const whole=1-d/Math.max(a.length,b.length);
+  const ta=tokens(a), tb=tokens(b);
+  const used=new Set(); let matched=0;
+  for(const x of ta){
+    let best=0,bi=-1;
+    tb.forEach((y,i)=>{if(!used.has(i)){const z=1-levenshtein(x,y)/Math.max(x.length,y.length);if(z>best){best=z;bi=i;}}});
+    if(best>=0.72){matched+=best; if(bi>=0)used.add(bi);}
+  }
+  const tokenScore=matched/Math.max(ta.length,tb.length);
+  const containment=(a.includes(b)||b.includes(a)) ? Math.min(a.length,b.length)/Math.max(a.length,b.length) : 0;
+  return Math.max(whole, 0.65*whole+0.35*tokenScore, containment*0.92);
+}
+function nameParts(s){
+  const t=tokens(s);
+  return {first:t[0]||"", last:t.slice(1).join(" ")};
+}
+function likelySame(a,b){
+  const A=nameParts(a), B=nameParts(b);
+  const sim=similarity(a,b);
+  const first=1-levenshtein(A.first,B.first)/Math.max(A.first.length,B.first.length,1);
+  const last=(A.last&&B.last)?1-levenshtein(A.last,B.last)/Math.max(A.last.length,B.last.length):0;
+  const oneMissing=(A.last===""||B.last==="") && first>=0.9;
+  if(sim>=0.94) return {score:sim, level:"auto"};
+  if(sim>=0.86 || (oneMissing && first>=0.92)) return {score:sim, level:"ask"};
+  return null;
+}
+
+function parseDescriptions(text){
+  const P={}, Pt={}, typeNames=[], typeLabels={}, types={};
+  for(const raw of String(text||"").split(/\r?\n/)){
+    const line=raw.trim(); if(!line)continue;
+    let m=line.match(/^(\d+)([A-Za-z])\s*(.*)$/);
+    if(m){(Pt[m[2]]??={})[+m[1]]=m[3]; types[m[2]]=1; continue;}
+    m=line.match(/^([A-Za-z])(\d+)\s*(.*)$/);
+    if(m){(Pt[m[1]]??={})[+m[2]]=m[3]; types[m[1]]=1; continue;}
+    m=line.match(/^\(([^()]+)\)\s*(.*)$/);
+    if(m){types[m[1]]=1; typeLabels[m[1]]=m[2]; typeNames.push(m[1]); continue;}
+    m=line.match(/^(\d+)\s+(.*)$/);
+    if(m){(P[+m[1]]??=[]).push(m[2]);}
+  }
+  return {P,Pt,typeNames,typeLabels};
+}
+
+function xmlText(x){
+  if(x===null||x===undefined)return "";
+  if(typeof x === "string")return x;
+  if(x instanceof Uint8Array)return new TextDecoder("utf-8").decode(x);
+  if(x.content!==undefined)return xmlText(x.content);
+  if(x.data!==undefined)return xmlText(x.data);
+  return String(x);
+}
+
+/*
+ * Socrative exports use fills to mark correct answers (DAF0DE) and
+ * incorrect answers (F9CCCC).  SheetJS versions differ in how much of
+ * the original style information they expose, so use BOTH the parsed
+ * cell style and the original XLSX XML as fallbacks.
+ */
+async function styleMapFromXlsx(raw, wb, ws){
+  const out={};
+
+  // First use any style information SheetJS happens to expose.
+  for(const addr of Object.keys(ws||{})){
+    if(addr[0]==='!') continue;
+    const cell=ws[addr];
+    const f=cell && cell.s && cell.s.fill && cell.s.fill.fgColor;
+    if(f){
+      const color=f.rgb || f.RGB || f.color;
+      if(color) out[addr.toUpperCase()]=String(color).replace(/^#/,'').toUpperCase();
+    }
+  }
+
+  // IMPORTANT: do not rely on SheetJS' style representation.  Socrative's
+  // XLSX files contain the decisive information in xl/styles.xml and in
+  // the worksheet's s="..." cell-style attribute.  Read those two pieces
+  // directly from the original ZIP.  This also avoids browser differences
+  // in SheetJS' optional style handling.
+  if(typeof JSZip === "undefined") throw new Error("Nedostaje JSZip biblioteka.");
+  const zip=await JSZip.loadAsync(raw);
+  const stylesFile=zip.file('xl/styles.xml');
+  if(!stylesFile) throw new Error("XLSX nema xl/styles.xml.");
+  const stylesText=await stylesFile.async('text');
+
+  // Get the <fills> section, then each individual <fill>.  Deliberately
+  // use small, anchored regexes here: an earlier implementation used one
+  // broad regex which could consume several <fill> elements at once.
+  const fillsMatch=stylesText.match(/<fills\b[^>]*>([\s\S]*?)<\/fills>/i);
+  const fillColors=[];
+  if(fillsMatch){
+    const fillBlocks=fillsMatch[1].match(/<fill\b[\s\S]*?<\/fill>/gi) || [];
+    for(const block of fillBlocks){
+      const m=block.match(/<fgColor\b[^>]*\brgb\s*=\s*["']([^"']+)["'][^>]*>/i);
+      fillColors.push(m ? m[1].replace(/^#/,'').toUpperCase() : '');
+    }
+  }
+
+  // cellXfs contains one <xf> for each cell style.  We only need fillId,
+  // and it is an attribute of the opening <xf> tag.
+  const xfsMatch=stylesText.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/i);
+  const xfFillIds=[];
+  if(xfsMatch){
+    const xfTags=xfsMatch[1].match(/<xf\b[^>]*>/gi) || [];
+    for(const tag of xfTags){
+      const m=tag.match(/\bfillId\s*=\s*["'](\d+)["']/i);
+      xfFillIds.push(m ? Number(m[1]) : 0);
+    }
+  }
+
+  // Find the worksheet XML corresponding to the sheet we actually read.
+  // Socrative normally has one sheet, but keep the sheet-order fallback.
+  const sheetFiles=Object.keys(zip.files).filter(k=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(k));
+  const wantedName=wb && wb.SheetNames ? wb.SheetNames[0] : null;
+  const wantedIndex=wantedName && wb.SheetNames ? wb.SheetNames.indexOf(wantedName) : 0;
+  const chosen=(wantedIndex>=0 && sheetFiles[wantedIndex]) ? sheetFiles[wantedIndex] : sheetFiles[0];
+  if(!chosen) throw new Error("XLSX nema worksheet XML.");
+
+  const sheetText=await zip.file(chosen).async('text');
+  const cellTags=sheetText.match(/<c\b[^>]*>/gi) || [];
+  for(const tag of cellTags){
+    const rm=tag.match(/\br\s*=\s*["']([^"']+)["']/i);
+    const sm=tag.match(/\bs\s*=\s*["'](\d+)["']/i);
+    if(!rm || !sm) continue;
+    const fillId=xfFillIds[Number(sm[1])];
+    const color=fillColors[fillId] || '';
+    if(color) out[rm[1].toUpperCase()]=color;
+  }
+
+  return out;
+}
+function isGreen(color){ return typeof color === "string" && (/^([0-9A-F]{2})?DAF0DE$/i.test(color) || color.toUpperCase().endsWith("DAF0DE")); }
+function isRed(color){ return typeof color === "string" && (/^([0-9A-F]{2})?F9CCCC$/i.test(color) || color.toUpperCase().endsWith("F9CCCC")); }
+
+async function readWorkbook(file){
+  const raw=await file.arrayBuffer();
+  const wb=XLSX.read(raw,{type:"array",cellStyles:true,bookFiles:true,cellNF:true});
+  return {wb,raw};
+}
+
+function findDataSheet(wb){
+  // Prefer the first sheet with a row containing "Student Name".
+  for(const sn of wb.SheetNames){
+    const ws=wb.Sheets[sn];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+    const idx=rows.findIndex(r=>String(r?.[0]||"").trim()==="Student Name");
+    if(idx>=0)return {ws,rows,headerRow:idx};
+  }
+  throw new Error("U datoteci nije pronađen red 'Student Name'.");
+}
+
+async function makeQuestionData(wb, raw, ws, rows, headerRow){
+  const headers=rows[headerRow].map(x=>String(x??""));
+  const pointRow=rows[headerRow+1]||[];
+  const style=await styleMapFromXlsx(raw, wb, ws);
+  const q=[], missing=[];
+  for(let c=4;c<headers.length;c++){
+    if(!headers[c])continue;
+    let type="", clean=headers[c];
+    const m=clean.match(/^\(([^)]+)\)\s*/);
+    if(m){type=m[1]; clean=clean.slice(m[0].length);}
+    clean=clean.replace(/\[.*?\]/g,"").trim();
+    const col=XLSX.utils.encode_col(c);
+    // Determine correct answer from the first answer row with a green/red style.
+    // Edge case: nobody answered correctly (no green cell in the column).
+    // That question is collected into `missing` so the user can type the
+    // correct answer manually instead of aborting the whole report.
+    let correct=null;
+    for(let r=headerRow+2;r<rows.length;r++){
+      const v=rows[r]?.[c];
+      if(v===null||v===undefined||v==="")continue;
+      const addr=col+(r+1);
+      if(isGreen(style[addr])){ correct=String(v); break; }
+    }
+    if(correct===null){ missing.push({col:c,header:clean,fullHeader:headers[c],type}); continue; }
+    correct=String(correct).replace(/^[A-Za-z0-9]+\.\s+/,"");
+    q.push({col:c,header:clean,type,correct});
+  }
+  return {questions:q,missing,style};
+}
+
+function makeAttempts(rows, headerRow, questions, style){
+  const attempts=[];
+  for(let r=headerRow+2;r<rows.length;r++){
+    const row=rows[r]||[];
+    const name=String(row[0]??"").trim();
+    if(!name || name==="Class Scoring" || /^Report Generated:/i.test(name)) continue;
+    const answers=questions.map(q=>{
+      const v=row[q.col];
+      const raw=(v===null||v===undefined)?"":String(v).trim();
+      if(q.correction){
+        const ok=correctionMatches(raw,q.correction);
+        return {raw,correct:ok,wrong:raw!==""&&!ok};
+      }
+      const addr=XLSX.utils.encode_col(q.col)+(r+1);
+      const green=isGreen(style[addr]), red=isRed(style[addr]);
+      return {raw,correct:green,wrong:red};
+    });
+    const answered=answers.filter(a=>a.raw!=="").length;
+    if(answered===0) continue;
+    attempts.push({name,answers,row:r+1});
+  }
+  return attempts;
+}
+
+class DSU{
+  constructor(n){this.p=Array.from({length:n},(_,i)=>i);}
+  find(x){while(this.p[x]!==x){this.p[x]=this.p[this.p[x]];x=this.p[x]}return x}
+  union(a,b){a=this.find(a);b=this.find(b);if(a!==b)this.p[b]=a}
+}
+
+function buildGroups(attempts){
+  const by={};
+  attempts.forEach((a,i)=>{const k=cleanName(a.name);(by[k]??=[]).push(i)});
+  const keys=Object.keys(by), dsu=new DSU(attempts.length);
+  for(const k of keys){for(let j=1;j<by[k].length;j++)dsu.union(by[k][0],by[k][j]);}
+  const groups=new Map();
+  attempts.forEach((a,i)=>{const root=dsu.find(i);(groups.get(root)??groups.set(root,[]).get(root)).push(i)});
+  return {dsu,groups};
+}
+
+function candidatePairs(attempts, groups){
+  const arr=[...groups.values()];
+  const reps=arr.map(g=>attempts[g[0]].name);
+  const cand=[];
+  for(let i=0;i<arr.length;i++)for(let j=i+1;j<arr.length;j++){
+    const lm=likelySame(reps[i],reps[j]);
+    if(lm)cand.push({i,j,a:arr[i],b:arr[j],score:lm.score,level:lm.level,decision:lm.level==="auto"});
+  }
+  return cand;
+}
+
+function mergeDecisions(attempts, baseGroups, candidates){
+  const dsu=baseGroups.dsu;
+  for(const c of candidates) if(c.decision) dsu.union(c.a[0],c.b[0]);
+  const groups=new Map();
+  attempts.forEach((a,i)=>{const root=dsu.find(i);if(!groups.has(root))groups.set(root,[]);groups.get(root).push(i)});
+  return groups;
+}
+
+function renderMatches(candidates, attempts){
+  $("matches").innerHTML="";
+  candidates.forEach((c,i)=>{
+    const div=document.createElement("div");div.className="match";
+    const pct=Math.round(c.score*100);
+    div.innerHTML=`<strong>${esc(attempts[c.a[0]].name)} ↔ ${esc(attempts[c.b[0]].name)} <span class="badge">${pct}%</span></strong>
+      <div class="small">Prijave: ${c.a.length} + ${c.b.length}. ${c.level==="auto"?"Visoka sličnost — automatski predloženo spajanje.":"Sličnost nije dovoljno sigurna za automatsko spajanje."}</div>
+      <div class="match-actions">
+        <button type="button" data-i="${i}" data-decision="yes">Spoji</button>
+        <button type="button" data-i="${i}" data-decision="no">Ne spajaj</button>
+      </div>`;
+    $("matches").appendChild(div);
+  });
+  $("matches").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{
+    const i=+b.dataset.i; candidates[i].decision=b.dataset.decision==="yes";
+    b.parentElement.parentElement.style.opacity=".55";
+  }));
+}
+
+function computeGroup(attempts, indices, questions){
+  const first=attempts[indices[0]];
+  const answers=questions.map((q,qi)=>{
+    const vals=indices.map(i=>attempts[i].answers[qi]).filter(a=>a.raw!=="");
+    const hadWrong=vals.some(a=>a.wrong);
+    const hadCorrect=vals.some(a=>a.correct);
+    return {text: hadWrong ? (vals.find(a=>a.wrong)?.raw||"-") : (hadCorrect ? (vals.find(a=>a.correct)?.raw||"-") : "-"),
+            correct: !hadWrong && hadCorrect,
+            answered: vals.length>0};
+  });
+  const score=100*answers.filter(a=>a.correct).length/questions.length;
+  return {name:first.name,attempts:indices.length,answers,score};
+}
+
+function descriptionFor(score, P){
+  const thresholds=Object.keys(P).map(Number).sort((a,b)=>b-a);
+  for(const p of thresholds) if(score>=p){
+    const list=P[p]||[];
+    if(!list.length)return "";
+    const idx=(randomSeed + (descriptionFor._count?.[p]||0))%list.length;
+    descriptionFor._count??={}; descriptionFor._count[p]=(descriptionFor._count[p]||0)+1;
+    return list[idx];
+  }
+  return "";
+}
+function typeDescriptions(group, questions, Pt, typeNames, typeLabels){
+  const out=[];
+  for(const t of typeNames){
+    const idx=questions.map((q,i)=>q.type===t?i:-1).filter(i=>i>=0);
+    if(!idx.length)continue;
+    const n=idx.filter(i=>group.answers[i].correct).length;
+    const pct=100*n/idx.length;
+    const thresholds=Object.keys(Pt[t]||{}).map(Number).sort((a,b)=>b-a);
+    let desc="";
+    for(const p of thresholds)if(pct>=p){desc=Pt[t][p];break;}
+    out.push(`<b>${pct.toFixed(0)}% ${esc(typeLabels[t]||t)}${desc? " — "+esc(desc):""}</b>`);
+  }
+  return out;
+}
+
+async function copyReport(text, box, label){
+  try{await navigator.clipboard.writeText(text);}catch{
+    const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();
+  }
+  box.classList.add("copied");setTimeout(()=>box.classList.remove("copied"),700);
+  box.classList.add("used");label.classList.add("used");
+  document.querySelectorAll(".student-name.current").forEach(e=>e.classList.remove("current"));
+  label.classList.add("current");
+}
+
+function createReport(groups, attempts, questions, desc){
+  descriptionFor._count={};
+  const minAnswered=Math.max(1,questions.length-6); const arr=[...groups.values()].map(ix=>({ix,g:computeGroup(attempts,ix,questions)})).filter(x=>x.ix.reduce((set,i)=>{attempts[i].answers.forEach((a,k)=>{if(a.raw!=="")set.add(k)});return set;},new Set()).size > minAnswered).map(x=>x.g);
+  arr.sort((a,b)=>{
+    const A=cleanName(a.name).split(" "),B=cleanName(b.name).split(" ");
+    const ka=(A[1]||"ZZZZZ")+" "+A[0], kb=(B[1]||"ZZZZZ")+" "+B[0];
+    return ka.localeCompare(kb,"hr");
+  });
+  $("reportContent").innerHTML="";
+  const avg=arr.length?arr.reduce((s,g)=>s+g.score,0)/arr.length:0;
+  for(const g of arr){
+    const d=descriptionFor(g.score,desc.P);
+    let text=`${$("zaglavlje").value}\nREZULTAT: ${g.score.toFixed(0)}% (${avg.toFixed(0)}% je prosjek razreda)\n`;
+    if(d)text+=d+"\n";
+    const typeLines=typeDescriptions(g,questions,desc.Pt,desc.typeNames,desc.typeLabels);
+    if(typeLines.length)text+=typeLines.map(x=>x.replace(/<[^>]+>/g,"")).join("\n")+"\n";
+    const bad=g.answers.map((a,i)=>a.correct?null:{i:i+1,q:questions[i].header,a:a.text}).filter(Boolean);
+    const prefix=$("pitanja").value;
+    if(prefix && bad.length){
+      text+=prefix.replace("#","(odgovoreno | ispravan odgovor)")+"\n";
+      for(const b of bad){
+        const q=questions[b.i-1];
+        const ans=(b.a||"-").replace(/^[A-Za-z0-9]+\.\s+/,"");
+        const ok=String(q.correct).replace(/^[A-Za-z0-9]+\.\s+/,"");
+        text+=`${b.i}. ${b.q} (${ans} | ${ok})\n`;
+      }
+    }
+    const div=document.createElement("div");div.className="student";
+    const label=document.createElement("div");label.className="student-name";
+    label.textContent=`${titleCase(g.name)} (${g.score.toFixed(0)}%)`;
+    const box=document.createElement("div");box.className="student-copy";
+    box.innerHTML=esc(text).replace(/\n/g,"<br>");
+    box.title="Klikni za kopiranje";
+    label.title="Klikni za kopiranje";
+    box.addEventListener("click",()=>copyReport(text,box,label));
+    label.addEventListener("click",()=>copyReport(text,box,label));
+    div.append(label,box);
+    if(g.attempts>1){const note=document.createElement("div");note.className="small";note.textContent=`Objedinjeno pokušaja: ${g.attempts}`;div.append(note);}
+    $("reportContent").appendChild(div);
+  }
+  $("reportContent").classList.add("hideBlocks");
+  $("toggleBlocks").textContent="Prikaži izvještaje";
+  $("report").style.display="block";
+  $("status").style.display="block";
+  $("status").textContent=`Generirano izvještaja: ${arr.length}`;
+  window.scrollTo({top:$("report").offsetTop-10,behavior:"smooth"});
+}
+
+function renderMissing(missing){
+  $("missingList").innerHTML="";
+  missing.forEach(q=>{
+    const div=document.createElement("div");div.className="missing-q";
+    const label=document.createElement("strong");label.textContent=q.header;
+    const input=document.createElement("input");
+    input.type="text";input.dataset.col=q.col;
+    input.placeholder="Upišite točan odgovor…";
+    input.setAttribute("aria-label","Točan odgovor za pitanje: "+q.header);
+    div.append(label,input);
+    $("missingList").appendChild(div);
+  });
+  $("missingWrap").style.display="block";
+  $("status").style.display="block";
+  $("status").textContent=`Za ${missing.length} pitanje(a) nitko nije dao točan odgovor. Upišite točne odgovore ispod pa kliknite Nastavi.`;
+  $("missingWrap").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function proceedWithQuestions(questions, style, rows, headerRow){
+  questions.sort((a,b)=>a.col-b.col);
+  applyCorrections(questions, parseCorrections($("ispravci").value));
+  const attempts=makeAttempts(rows,headerRow,questions,style);
+  if(!attempts.length)throw new Error("Nisu pronađene učeničke prijave.");
+  resolveCorrectionTexts(questions, attempts);
+  const base=buildGroups(attempts);
+  const candidates=candidatePairs(attempts,base.groups);
+  pending={attempts,questions,base,candidates,desc:parseDescriptions($("opisi").value)};
+  const ask=candidates.filter(c=>c.level==="ask");
+  if(ask.length){
+    renderMatches(candidates,attempts);
+    $("matchModal").style.display="block";
+    $("status").textContent=`Pronađeno mogućih duplikata: ${candidates.length}. Potrebna je potvrda za ${ask.length}.`;
+  }else{
+    finish();
+  }
+}
+
+function continueWithManualAnswers(){
+  const pm=pendingMissing;
+  if(!pm)return;
+  const inputs=[...$("missingList").querySelectorAll("input[data-col]")];
+  const manual=[];
+  for(const inp of inputs){
+    const v=inp.value.trim();
+    if(!v){
+      $("error").style.display="block";
+      $("error").textContent="Za svako navedeno pitanje upišite točan odgovor.";
+      inp.focus();
+      return;
+    }
+    const col=+inp.dataset.col;
+    const meta=pm.missing.find(q=>q.col===col) || {header:"",type:""};
+    manual.push({col,header:meta.header,type:meta.type,
+      correct:v.replace(/^[A-Za-z0-9]+\.\s+/,"")});
+  }
+  $("error").style.display="none";
+  $("missingWrap").style.display="none";
+  pendingMissing=null;
+  try{
+    proceedWithQuestions(pm.questions.concat(manual), pm.style, pm.rows, pm.headerRow);
+  }catch(e){
+    console.error(e);$("error").style.display="block";$("error").textContent="Greška: "+e.message;
+    $("status").style.display="none";
+  }
+}
+
+async function generate(){
+  $("error").style.display="none";$("report").style.display="none";
+  $("missingWrap").style.display="none";pendingMissing=null;
+  const file=$("xml").files[0];
+  if(!file){$("error").style.display="block";$("error").textContent="Najprije odaberite XLSX datoteku.";return;}
+  try{
+    $("status").style.display="block";$("status").textContent="Učitavam i analiziram XLSX datoteku…";
+    const {wb,raw}=await readWorkbook(file);
+    const {ws,rows,headerRow}=findDataSheet(wb);
+    const {questions,missing,style}=await makeQuestionData(wb,raw,ws,rows,headerRow);
+    if(missing.length){
+      pendingMissing={questions,missing,style,rows,headerRow};
+      renderMissing(missing);
+      return;
+    }
+    proceedWithQuestions(questions,style,rows,headerRow);
+  }catch(e){
+    console.error(e);$("error").style.display="block";$("error").textContent="Greška: "+e.message;
+    $("status").style.display="none";
+  }
+}
+function finish(){
+  const p=pending;
+  const groups=mergeDecisions(p.attempts,p.base,p.candidates);
+  $("matchModal").style.display="none";
+  createReport(groups,p.attempts,p.questions,p.desc);
+}
+$("generateBtn").addEventListener("click",generate);
+$("acceptMatches").addEventListener("click",finish);
+$("missingContinue").addEventListener("click",continueWithManualAnswers);
+$("toggleBlocks").addEventListener("click",()=>{
+  const hidden=$("reportContent").classList.toggle("hideBlocks");
+  $("toggleBlocks").textContent=hidden?"Prikaži izvještaje":"Sakrij izvještaje";
+});
+</script>
+</body>
+</html>

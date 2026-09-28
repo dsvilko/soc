@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8;charset=utf-8">
+<link href='https://fonts.googleapis.com/css?family=Lato:100,200,300,400,500,600,700' rel='stylesheet' type='text/css'>
+<style>
+@import "compass/css3";
+
+* {
+  /*box-sizing: border-box;*/
+  font-family: 'Lato', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-weight: 300;
+  height: 100%;
+  background: #053777;
+  color: #fff;
+  font-size: 14px;
+  /*overflow: hidden;*/
+}	
+																								  
+label {
+  font-weight: 500;
+  display: block;
+  margin: 4px 0;
+  text-transform: uppercase;
+  font-size: 18px;
+  overflow: hidden;
+}  
+
+span {
+    float: right;
+    text-transform: none;
+    font-weight: 400;
+    line-height: 1em;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.form-group {
+  max-width: 500px;
+  margin: auto;
+  margin-bottom: 15px;
+	padding: 20px;
+	font-size: 22px;
+	text-align: justify;
+  text-justify: inter-word;
+}
+
+textarea {
+	font-size: 22px;
+}
+
+.mybutton {
+  text-align: center;
+  margin: 10px;
+	padding: 20px;
+  font-weight: 400;
+	font-size: 26px;
+	width: 100%;
+	background: #ff8;
+	border: 0px;
+}
+
+h1 {
+  text-align: center;
+  margin: 10px;
+	padding: 20px;
+  font-weight: 300;
+	font-size: 32px;
+	width: 82%;
+	border: 0px;
+	color: white;
+}
+
+.helpbutton {
+	text-align: center;
+  margin: 1px;
+	padding: 10px;
+  font-weight: 700;
+	font-size: 35px;
+	width: 10%;
+	border: 2px solid #fff;
+	border-radius: 50px;
+	text-decoration: none;
+}
+.helpbutton:link {
+	color: white;
+}
+.helpbutton:visited {
+	color: white;
+}
+.helpbutton:hover {
+	color: black;
+	background: white;
+}
+.mybutton:hover {
+	background: #ff0;
+}
+
+.form-control {
+  display: block;
+  padding: 8px 8px;
+  width: 100%;
+  font-size: 20px;
+  background-color: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  font-weight: 400;
+	text-align: justify;
+  text-justify: inter-word;
+}
+.form-control:focus { 
+  outline: 2px solid rgba(255,255,255,1);
+  outline: -webkit-focus-ring-color auto 5px;
+}
+
+a:visited {
+	color: white;
+}
+a:hover {
+	color: #ff0;
+}
+a:link {
+	color: white;
+}
+
+</style>
+<title>Socrative izvještaj generator - POMOĆ</title>
+</head>
+<body>
+
+<div class="form-group">
+<input type="button" class="mybutton" value="Povratak." onclick="history.back()">
+</div>
+
+<div class="form-group">
+<h1>POMOĆ</h1>
+</div>
+
+<div class="form-group">
+    <label for="zaglavlje">Uvod</label>
+Ovaj web servis namijenjen je kao pomoć pri korištenju Socrative kvizova za formativno vrednovanje učeničkih postignuća.
+Cilj formativnog vrednovanja, posebno vrednovanja za učenje, je svim učenicima dati što češću, njima i njihovim roditeljima
+razumljivu, povratnu informaciju o napretku i potencijalnim rupama u znanju i vještinama koje kroz dodatnu vježbu 
+i ponavljanje moraju popuniti. Klasično, ovakvi oblici vrednovanja oduzimaju jako puno vremena te se zato u praksi ne 
+provode dovoljno često. On-line kvizovi kao što je Socrative omogućuju upravo vrlo brzo vrednovanje, bez trošenja vremena
+na ispis i ispravljanje kratkih pisanih provjera. Iako učenici mogu nakon kviza odmah vidjeti što su sve pogriješili, 
+vrijednost takvog kviza, za vrednovanje za učenje, višestruko raste ako do te informacije, o točnim pitanjima na koja nisu 
+dali ispravan odgovor, mogu i kasnije lako doći. <br>
+Ovaj web servis umogućuje upravo to. Kao ulaz uzima razredni izvještaj koji je moguće skinuti sa Socrative stranice, 
+opisne ocjene koje odgovaraju pojedinim razinama uspješnosti i kao izlaz generira zasebne izvještaje za svakog pojedinog
+učenika koje je vrlo lako brzo unjeti u e-dnevnik. Na ovaj način, moguće je u e-dnevnik, za jedan razred, učenicima upisati 
+ukupno preko 500 linija korisnih povratnih informacija u manje od minute. Na taj način kvalitetno formativno vrednovanje
+postaje ne samo u teoriji korisno nego i u praksi izvedivo.
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Odabir datoteke</label>
+S lokalnog diska odaberite socrative .xmlx report datoteku. 
+Tu datoteku dobijete odabirom "Reports" na svojoj Socrative stranici, zatim odaberete neki od završenih kvizova, 
+kliknete na "REPORTS" u gornjem desnom kutu te na "Download" (<i>"Whole Class Excel"</i> mora biti obilježen).
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Zaglavlje</label>
+Opis koji će biti postavljen iznad samog izvještaja o uspjehu. Izvještaj za učenika ima oblik:<p>
+<i>ZAGLAVLJE</i><br>
+REZULTAT: postotak<br>
+<i>OPISNA OCJENA</i><br>
+<i>TEKST PRIJE POPISA PITANJA</i><br>
+Popis svih pitanja, s rednim brojem, na koja nije uspješno dan točan odgovor.
+
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Opisi razina uspjeha</label>
+Niz redova od kojih svaki započinje brojkom iza koje je razmak pa opis.
+Brojka predstavlja minimalan postotak točno riješenih zadataka kod kojih će učeniku biti dan taj opis za njegovo postignuće.
+Brojke moraju biti sortirane od najveće do najmanje, na kraju obavezno završno s brojem <b>0</b>. <br>
+Broj redova odnosno pripadnih gradacija postignuća nije ograničen. 
+Ako dva uzastopna reda počinju s istim brojem, učenicima koji upadnu u tu kategoriju biti će naizmjenično biran jedan od 
+ponuđenih opisa. Tako je moguće uvesti veću varijabilnost u opisnim ocjenama iste razine postignuća.<br>
+Pazite da opisi budu rod-neutralni.  
+<p>
+<b>Primjer:</b><br>
+<i>
+80 Uspješno usvojeno gradivo.<br>
+80 Bravo, većina je gradiva uspješno usvojena.<br>
+50 Djelomično usvojeno gradivo.<br>
+0 Gradivo nije zadovoljavajuće usvojeno.<br>
+</i>
+<p>
+Učenici koji su uspješno riješili 80% ili više dobiti će naizmjenično jednu od prve dvije poruke. 
+Drugu će poruku dobiti učenici s između 50% i 79% točnih odgovora. 
+Učenici s manje od 50% točnih odgovora dobiti će posljednju poruku.
+<p>
+Preporuka je da ove opise držite pohranjene u nekoj datoteci na vlastitom disku kako bi ih brzo i jednostavno
+mogli kopirati u ovaj kvadratić. 
+
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Višeelementno vrednovanje</label>
+Ovaj program ima podršku za istovoremeno praćenje više različitih elemenata vrednovanja preko različitih
+vrsta pitanja u Socrative kvizu. Ako želite koristiti ovu mogućnost, na početak teksta svakog od pitanja u
+Socrative kvizu potrebno je u običnim zagradama staviti jedno slovo koje vam označava u koju skupinu 
+pripada to pitanje. Recimo, (u) na početku pitanja može označavati da se radi o pitanju kojim provjeravate 
+usvojenost temeljnih pojmova - odabir slova je na vama. 
+Ako želite zasebno bodovanje tada ispred opisnih ocjena trebate za svaki element vrednovanja
+dodati red ovog oblika (najjednostavnije objasniti na primjeru):
+<p>
+<i>
+(u) Usvojenost temeljnih pojmova.<br>
+(p) Primjena na konceptualnim zadacima.<br>
+</i>
+<p>
+Ako želite različite elemente vrednovanja popratiti i zasebnim opisnim ocjenama, to možete učitini tako da 
+u redove sa postocima i opisima, ispred postotka dodate slovo elementa na koji se odnosi. Na primjeru bi
+to ovako izgledalo:
+<p>
+<i>
+u85 Temeljni pojmovi i definicije uspješno su usvojeni.<br>
+u65 Temeljni pojmovi i definicije su djelomično uspješno usvojeni.<br>
+u50 Usvojen je tek dio temeljnih pojmova i definicija.<br>
+u0 Usvojen je samo mali dio temeljnih pojmova i definicija, nedovoljno za prolaznu ocjenu.<br>
+<p>
+p85 Izvrsno primjenjuje stečeno znanje na konceptualnim zadacima.<br>
+p65 Uspješno rješava dio konceptualnih zadataka.<br>
+p50 Zbog površnog razumijevanja, uspješno rješava samo manji dio konceptualnih zadataka.<br>
+p0 Razumijevanje pojmova nije dostatno za njihovu konkretnu primjenu.<br>
+</i>
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Prije popisa pitanja</label>
+Ovdje možete staviti kratak tekst koji će prethoditi popisu pitanja na koja nije dan točan odgovor. 
+Ako red sadrži ljestve, #, to će mjesto najprije biti zamijenjeno s pojašnjenjim (odgovoreno | točan odgovor), a 
+iza svakog pogrešno odgovorenog pitanja bit će u jednakom formatu napisan odgovor koji je učenik na njega dao
+kao i točan odgovor koji je trebao dati. 
+U koliko je ovo polje prazno, u izvještaj neće biti dodan popis pitanja, samo uspjeh i opisna ocjena.
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Generiranje izvještaja</label>
+Nakon što ste odabrali datoteku i ispunili potrebna polja, odaberite <b><i>"Generiraj Socrativ izvještaj"</i></b>.
+Generiranje traje nekoliko sekundi pa pričekajte (nemojte višestruko klikati na tipku).<br>
+Na novootvorenoj stranici nalazi se popis svih učenika koji su kviz riješili dajući neki odgovor na većinu pitanja. 
+Učenici koji su odgovorili na svega par pitanja izbačeni su s popisa. Klikom mišem na opisni tekst pojedinog učenika on 
+se automatski kopira te ga je s <b>Ctrl-V</b> moguće zalijepiti u pripadno polje u E-Dnevniku, 
+najjednostavnije u grupnom upisu ocjena ili bilježaka. Na dnu stranice nalazi se poveznica za povratak na prethodnu
+stranicu i laki odabir nove datoteke za idući razred (nije potrebno ponovno ispinjavati formular).
+</div>
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Savjeti za brži unos:</label>
+    <label for="zaglavlje">Firefox</label>
+Preporučen preglednik za najlakše korištenje ovog servisa.
+S dodatkom za Firefox <a href="https://addons.mozilla.org/en-US/firefox/addon/open-link-in-sidebar/" >Open in Sidebar</a>
+moguće je otvoriti <b>Socrative izvještaj generator</b> u malenom bočnom prozoru paralelno s e-dnevnikom.
+    <label for="zaglavlje">Ostali preglednici</label>
+Otvorite dva zasebna prozora te ih posložite da su jedan pored drugoga na ekranu. 
+Na taj način možete imati paralelno otvoren e-dnevnik i ovu stranicu.
+</div>		
+<br>
+<div class="form-group">
+    <label for="zaglavlje">Savjeti pri izradi Socrative kviza</label>
+Kada se učenici prijavljuju u Socrative kviz kažite im da obavezno koriste puno ime i prezime, ne prezime pa ime.
+Na taj način će lista učenika u izvještaju biti ispravno sortirana za što lakši unos u e-dnevnik.
+<p>
+Ako pitanja u Socrative kvizu sadrže neki tekst u [uglatim zagradama], on će biti izostavljen iz samog
+pitanja u izvještaju. Na taj način zagrade u kvizu možete koristiti za dodatna pojašnjenja npr. <i>"[samo jedna riječ]"</i>, bez
+potrebe da ta poješnjenja završe u e-dnevniku.
+
+</div>
+
+
+
+
+<div class="form-group">
+<input type="button" class="mybutton" value="Povratak." onclick="history.back()">
+</div>
+
+</body>
+</html>

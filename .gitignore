@@ -1,0 +1,6 @@
+# Student data — Socrative exports contain student names, never commit them
+*.xlsx
+*.XLSX
+
+# Test deps are reinstallable via test/package-lock.json
+test/node_modules/

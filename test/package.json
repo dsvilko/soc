@@ -1,0 +1,13 @@
+{
+  "name": "soc-report-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline harness testing index.html logic against test.xlsx",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "jszip": "3.10.1",
+    "xlsx": "0.18.5"
+  }
+}
