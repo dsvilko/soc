@@ -56,6 +56,9 @@ summary{cursor:pointer;font-size:20px;font-weight:600}
 .missing-q{margin:12px 0;padding:10px;background:rgba(0,0,0,.2);border-radius:8px}
 .missing-q strong{display:block;margin-bottom:6px}
 .missing-q input{display:block;padding:10px;width:100%;font-size:18px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:4px}
+#zamjeneList .replace-row{display:flex;gap:8px;margin:8px 0}
+#zamjeneList .replace-row input{flex:1;min-width:0;display:block;padding:10px;font-size:18px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:4px}
+#zamjeneList .remove-replace{flex:0 0 auto;margin:4px;padding:6px 14px;font-size:20px}
 @media(max-width:600px){label span{float:none;display:block;margin-top:3px}.form-group{padding:8px 12px}button{font-size:19px}}
 </style>
 </head>
@@ -97,6 +100,14 @@ summary{cursor:pointer;font-size:20px;font-weight:600}
 </div>
 
 <div class="form-group">
+  <label for="zamjeneList">Ispravci teksta<span>traži → zamijeni, samo cijele riječi</span></label>
+  <div id="zamjeneList"></div>
+  <div style="text-align:right;margin-top:8px">
+    <button id="dodajZamjenu" type="button">Dodaj zamjenu</button>
+  </div>
+</div>
+
+<div class="form-group">
   <div id="status"></div>
   <div id="error"></div>
 </div>
@@ -134,6 +145,8 @@ summary{cursor:pointer;font-size:20px;font-weight:600}
 <h3>Ispravci točnih odgovora</h3>
 <p>Ako je u kvizu pogrešno označen točan odgovor (boje u XLSX-u su krive), upišite ispravak u polje "Ispravci točnih odgovora", jedan po retku u obliku <b>broj. odgovor</b>, npr. <b>5. A</b> — broj je redni broj pitanja u izvještaju (1 = prvo pitanje slijeva u XLSX-u). Polje je zadano prazno, što znači bez ispravaka.</p>
 <p>Ispravak ima prednost pred bojama ćelija: kod izbora jednog slova ili znamenke uspoređuje se početno slovo odgovora (<code>A. metar</code> → A), inače se uspoređuje cijeli tekst odgovora bez oznake izbora. U izvještaju se i dani i ispravan odgovor uvijek prikazuju kao puni tekst bez slova izbora. Neispravan redak ili broj nepostojećeg pitanja javlja grešku umjesto generiranja izvještaja.</p>
+<h3>Ispravci teksta</h3>
+<p>Ako naknadno primijetite tipfeler u tekstu zadatka ili ponuđenog odgovora, dodajte par Traži → Zamijeni s (gumbom "Dodaj zamjenu" dodajte po jedan par za svaku grešku). Zamjena vrijedi samo za cijele riječi (npr. <code>metr</code> ne dira <code>metri</code>), razlikuje velika i mala slova i zamjenjuje sve pojave, parove redom. Primjenjuje se strogo na tekst pitanja i ponuđene odgovore višestrukog izbora; slobodan učenički unos ostaje netaknut, a bodovanje se ne mijenja. Prazan redak "Traži" ignorira se, a prazan "Zamijeni s" briše riječ.</p>
 <h3>Nedostaju točni odgovori (ručni unos)</h3>
 <p>Ako za neko pitanje nitko nije odgovorio točno, u stupcu nema zelene ćelije pa točan odgovor nije zapisan u XLSX datoteci. Program tada ne odustaje, nego ispod obrasca prikaže svako takvo pitanje s poljem za ručni upis točnog odgovora. Upišite odgovor za svako navedeno pitanje (prazno polje blokira nastavak uz poruku o grešci) i kliknite "Nastavi s unesenim odgovorima". Oznaka izbora poput <code>A.</code> na početku unosa uklanja se automatski.</p>
 <h3>Višestruki pokušaji i spajanje prijava</h3>
@@ -231,6 +244,39 @@ function applyCorrections(questions, corrections){
     questions[i].correct=corrections[n];
     questions[i].correction=corrections[n];
   }
+}
+// Ispravci teksta: jednostavni search/replace parovi (bez regexa) za naknadno
+// uočene tipfelere u zadacima/ponuđenim odgovorima. Vrijede samo za cijele
+// riječi, case-sensitive, sve pojave, parovi redom. Opseg je strogo tekst
+// pitanja + ponuđeni odgovori višestrukog izbora; slobodan učenički unos i
+// bodovanje ostaju netaknuti.
+function escapeRegExp(s){
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+}
+function applyTextReplacements(text, pairs){
+  let s=String(text ?? "");
+  for(const p of pairs || []){
+    const from=String(p.from ?? "");
+    if(!from)continue;
+    const to=String(p.to ?? "");
+    const re=new RegExp("(?<![\\p{L}\\p{N}_])"+escapeRegExp(from)+"(?![\\p{L}\\p{N}_])","gu");
+    s=s.replace(re,()=>to);
+  }
+  return s;
+}
+// Odgovor višestrukog izbora nosi oznaku izbora ("A. metar"); sve ostalo je
+// slobodan učenički unos koji se ne dira.
+function isMultipleChoice(raw){
+  return /^\s*[A-Za-z0-9]\s*\./.test(String(raw ?? ""));
+}
+// Prikaz jednog retka popisa: točan odgovor (kviz-strana) uvijek kroz zamjene,
+// učenički odgovor samo ako je višestruki izbor.
+function displayPair(rawAns, correct, pairs){
+  const raw=rawAns ?? "-";
+  const stripped=String(raw).replace(/^[A-Za-z0-9]+\.\s+/,"");
+  const ans=isMultipleChoice(raw)?applyTextReplacements(stripped,pairs):stripped;
+  const ok=applyTextReplacements(String(correct).replace(/^[A-Za-z0-9]+\.\s+/,""),pairs);
+  return {ans,ok};
 }
 // After attempts are known, replace a single-letter correction ("5. A") with
 // the full answer text carrying that choice letter ("A. metar" → "metar"),
@@ -577,6 +623,7 @@ async function copyReport(text, box, label){
 
 function createReport(groups, attempts, questions, desc){
   descriptionFor._count={};
+  const pairs=collectReplacements();
   const minAnswered=Math.max(1,questions.length-6); const arr=[...groups.values()].map(ix=>({ix,g:computeGroup(attempts,ix,questions)})).filter(x=>x.ix.reduce((set,i)=>{attempts[i].answers.forEach((a,k)=>{if(a.raw!=="")set.add(k)});return set;},new Set()).size > minAnswered).map(x=>x.g);
   arr.sort((a,b)=>{
     const A=cleanName(a.name).split(" "),B=cleanName(b.name).split(" ");
@@ -597,9 +644,9 @@ function createReport(groups, attempts, questions, desc){
       text+=prefix.replace("#","(odgovoreno | ispravan odgovor)")+"\n";
       for(const b of bad){
         const q=questions[b.i-1];
-        const ans=(b.a||"-").replace(/^[A-Za-z0-9]+\.\s+/,"");
-        const ok=String(q.correct).replace(/^[A-Za-z0-9]+\.\s+/,"");
-        text+=`${b.i}. ${b.q} (${ans} | ${ok})\n`;
+        const shown=displayPair(b.a,q.correct,pairs);
+        const title=applyTextReplacements(b.q,pairs);
+        text+=`${b.i}. ${title} (${shown.ans} | ${shown.ok})\n`;
       }
     }
     const div=document.createElement("div");div.className="student";
@@ -623,11 +670,50 @@ function createReport(groups, attempts, questions, desc){
   window.scrollTo({top:$("report").offsetTop-10,behavior:"smooth"});
 }
 
+function collectReplacements(root){
+  const out=[];
+  const list=root || $("zamjeneList");
+  if(!list)return out;
+  const rows=list.querySelectorAll(".replace-row");
+  for(const row of rows){
+    let fromEl=null,toEl=null;
+    if(typeof row.querySelector==="function"){
+      fromEl=row.querySelector('input[data-from]');
+      toEl=row.querySelector('input[data-to]');
+    }else{
+      for(const inp of row.querySelectorAll("input")){
+        if(inp.dataset && inp.dataset.from!==undefined)fromEl=inp;
+        if(inp.dataset && inp.dataset.to!==undefined)toEl=inp;
+      }
+    }
+    const from=String(fromEl?fromEl.value:"").trim();
+    if(!from)continue;
+    out.push({from,to:String(toEl?toEl.value:"")});
+  }
+  return out;
+}
+function addReplacementRow(from,to){
+  const row=document.createElement("div");row.className="replace-row";
+  const f=document.createElement("input");
+  f.type="text";f.dataset.from="";f.placeholder="Traži…";f.value=from||"";
+  f.setAttribute("aria-label","Traži tekst");
+  const t=document.createElement("input");
+  t.type="text";t.dataset.to="";t.placeholder="Zamijeni s…";t.value=to||"";
+  t.setAttribute("aria-label","Zamjenski tekst");
+  const rm=document.createElement("button");
+  rm.type="button";rm.textContent="×";rm.title="Ukloni par";rm.className="remove-replace";
+  rm.addEventListener("click",()=>row.remove());
+  row.append(f,t,rm);
+  $("zamjeneList").appendChild(row);
+  return row;
+}
+
 function renderMissing(missing){
   $("missingList").innerHTML="";
+  const pairs=collectReplacements();
   missing.forEach(q=>{
     const div=document.createElement("div");div.className="missing-q";
-    const label=document.createElement("strong");label.textContent=q.header;
+    const label=document.createElement("strong");label.textContent=applyTextReplacements(q.header,pairs);
     const input=document.createElement("input");
     input.type="text";input.dataset.col=q.col;
     input.placeholder="Upišite točan odgovor…";
@@ -717,6 +803,8 @@ function finish(){
   createReport(groups,p.attempts,p.questions,p.desc);
 }
 $("generateBtn").addEventListener("click",generate);
+$("dodajZamjenu").addEventListener("click",()=>addReplacementRow("",""));
+addReplacementRow("","");
 $("acceptMatches").addEventListener("click",finish);
 $("missingContinue").addEventListener("click",continueWithManualAnswers);
 $("toggleBlocks").addEventListener("click",()=>{

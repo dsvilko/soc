@@ -52,11 +52,19 @@ function mkEl(tag) {
       const out = [];
       const walk = (n) => {
         if (sel === "input[data-col]" && n.tag === "input" && n.dataset.col !== undefined) out.push(n);
+        if (sel === "input[data-from]" && n.tag === "input" && n.dataset.from !== undefined) out.push(n);
+        if (sel === "input[data-to]" && n.tag === "input" && n.dataset.to !== undefined) out.push(n);
+        if (sel === "input" && n.tag === "input") out.push(n);
+        if (sel === ".replace-row" && n._cls.has("replace-row")) out.push(n);
         if (sel === "button" && n.tag === "button") out.push(n);
         (n.children || []).forEach(walk);
       };
       walk(this);
       return out;
+    },
+    querySelector(sel) {
+      const all = this.querySelectorAll(sel);
+      return all.length ? all[0] : null;
     },
   };
   el.classList = {
@@ -107,6 +115,8 @@ eval(script + `
   buildGroups, candidatePairs, parseCorrections, applyCorrections,
   resolveCorrectionTexts, correctionMatches, renderMissing,
   continueWithManualAnswers, proceedWithQuestions, finish, copyReport,
+  applyTextReplacements, isMultipleChoice, displayPair,
+  collectReplacements, addReplacementRow,
   __setPendingMissing: (v) => { pendingMissing = v; } };
 `);
 const A = globalThis.__api;
@@ -170,6 +180,7 @@ function assert(cond, msg) {
   assert(inputs[0]._focused === true, "empty manual input focused");
   // valid submit continues into the duplicate-merge modal (ask-level pair exists)
   inputs[0].value = "17";
+  A.addReplacementRow("predmenta", "predmeta");
   A.continueWithManualAnswers();
   assert(getEl("missingWrap").style.display === "none", "missing box hidden after valid input");
   assert(getEl("matchModal").style.display === "block", "duplicate-merge modal shown for ask-level pair");
@@ -219,6 +230,37 @@ function assert(cond, msg) {
   try { A.parseCorrections("abc"); } catch (e) { threw++; }
   try { A.applyCorrections([{ correct: "x" }], { 9: "A" }); } catch (e) { threw++; }
   assert(threw === 2, "bad correction line / number throws");
+
+  // --- text replacements (Ispravci teksta): whole-word, case-sensitive
+  const allHtml = reportBoxes.map((e) => e._html).join("\n");
+  assert(allHtml.includes("predmeta"), "replacement applied to question header in report");
+  assert(!allHtml.includes("predmenta"), "original typo gone from report");
+  assert(A.applyTextReplacements("metr i metri", [{ from: "metr", to: "metar" }]) === "metar i metri",
+    "whole-word only (metri untouched)");
+  assert(A.applyTextReplacements("Metr metr", [{ from: "metr", to: "X" }]) === "Metr X",
+    "case-sensitive replacement");
+  assert(A.applyTextReplacements("a+b (a+b)", [{ from: "a+b", to: "c" }]) === "c (c)",
+    "special chars escaped, all occurrences replaced");
+  assert(A.applyTextReplacements("predmenta, predmenta!", [{ from: "predmenta", to: "predmeta" }]) === "predmeta, predmeta!",
+    "punctuation counts as word boundary");
+  assert(A.applyTextReplacements("metr", [{ from: "", to: "X" }, { from: "metr", to: "" }]) === "",
+    "empty search skipped, empty replacement deletes");
+  assert(A.applyTextReplacements("a b", [{ from: "a", to: "b" }, { from: "b", to: "c" }]) === "c c",
+    "pairs applied in order");
+  assert(A.isMultipleChoice("A. metar") === true, "MC answer detected by choice prefix");
+  assert(A.isMultipleChoice("17") === false, "free numeric answer is not MC");
+  assert(A.isMultipleChoice("-") === false, "dash is not MC");
+  const dp1 = A.displayPair("A. metr", "B. metr", [{ from: "metr", to: "metar" }]);
+  assert(dp1.ans === "metar" && dp1.ok === "metar", "MC student + correct answers replaced");
+  const dp2 = A.displayPair("17", "17", [{ from: "17", to: "18" }]);
+  assert(dp2.ans === "17" && dp2.ok === "18", "free student answer untouched, correct replaced");
+  // dynamic rows: collect skips empty search
+  getEl("zamjeneList").innerHTML = "";
+  A.addReplacementRow("predmenta", "predmeta");
+  A.addReplacementRow("", "ignored");
+  A.addReplacementRow("metr", "metar");
+  assert(JSON.stringify(A.collectReplacements()) === JSON.stringify([{ from: "predmenta", to: "predmeta" }, { from: "metr", to: "metar" }]),
+    "collectReplacements skips empty search");
 
   console.log(failures === 0 ? "\nALL TESTS PASSED" : "\n" + failures + " TEST(S) FAILED");
   process.exit(failures === 0 ? 0 : 1);
