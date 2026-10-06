@@ -190,6 +190,32 @@ let pendingMissing = null;
 let randomSeed = Math.floor(Math.random()*100);
 let decisionState = [];
 
+// Polja "Zaglavlje", "Opisi razina uspjeha" i "Prije popisa pitanja"
+// čuvaju se u localStorage pri svakom kliku na "Generiraj..." i
+// vraćaju pri prvom učitavanju stranice.
+const LS_KEY = "socrativeReportFields.v1";
+function saveFields(){
+  try{
+    if(typeof localStorage === "undefined")return;
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      zaglavlje: $("zaglavlje").value,
+      opisi: $("opisi").value,
+      pitanja: $("pitanja").value
+    }));
+  }catch{}
+}
+function loadFields(){
+  try{
+    if(typeof localStorage === "undefined")return;
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw)return;
+    const d = JSON.parse(raw);
+    if(d && typeof d.zaglavlje === "string")$("zaglavlje").value = d.zaglavlje;
+    if(d && typeof d.opisi === "string")$("opisi").value = d.opisi;
+    if(d && typeof d.pitanja === "string")$("pitanja").value = d.pitanja;
+  }catch{}
+}
+
 $("xml").addEventListener("change", () => {
   const f=$("xml").files[0];
   $("fileText").textContent=f ? "datoteka odabrana: "+f.name : "odaberi ili dovuci datoteku";
@@ -776,6 +802,7 @@ function continueWithManualAnswers(){
 }
 
 async function generate(){
+  saveFields();
   $("error").style.display="none";$("report").style.display="none";
   $("missingWrap").style.display="none";pendingMissing=null;
   const file=$("xml").files[0];
@@ -804,6 +831,7 @@ function finish(){
 }
 $("generateBtn").addEventListener("click",generate);
 $("dodajZamjenu").addEventListener("click",()=>addReplacementRow("",""));
+loadFields();
 addReplacementRow("","");
 $("acceptMatches").addEventListener("click",finish);
 $("missingContinue").addEventListener("click",continueWithManualAnswers);
